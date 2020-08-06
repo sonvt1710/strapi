@@ -1,10 +1,10 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { List, Header } from '@buffetjs/custom';
 import { Pencil } from '@buffetjs/icons';
 import { useIntl } from 'react-intl';
 import { useHistory } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useUserPermissions } from 'strapi-helper-plugin';
+import { useUserPermissions, PopUpWarning, request } from 'strapi-helper-plugin';
 
 import permissions from '../../../permissions';
 import { EmptyRole, RoleListWrapper, RoleRow } from '../../../components/Roles';
@@ -15,24 +15,72 @@ import pluginId from '../../../pluginId';
 const RoleListPage = () => {
   const { formatMessage } = useIntl();
   const { push } = useHistory();
-  const { roles, isLoading } = useRolesList();
-  const {
-    allowedActions: { canUpdate, canDelete },
-  } = useUserPermissions(permissions.accessRoles);
+  const { roles, getData, isLoading } = useRolesList();
+  const [modalToDelete, setModalDelete] = useState();
 
-  const handleGoTo = useCallback(
-    id => {
-      if (canUpdate) {
-        push(`/settings/${pluginId}/roles/${id}`);
-      }
-    },
-    [canUpdate, push]
-  );
-
-  const handleToggle = useCallback(e => {
-    e.preventDefault();
-    e.stopPropagation();
+  const updatePermissions = useMemo(() => {
+    return {
+      update: permissions.updateRole,
+      create: permissions.createRole,
+      delete: permissions.deleteRole,
+    };
   }, []);
+  const {
+    isLoading: isLoadingForPermissions,
+    allowedActions: { canCreate, canUpdate, canDelete },
+  } = useUserPermissions(updatePermissions);
+
+  const handleGoTo = id => {
+    push(`/settings/${pluginId}/roles/${id}`);
+  };
+
+  const handleDelete = () => {
+    strapi.lockAppWithOverlay();
+
+    Promise.resolve(
+      request(`/${pluginId}/roles/${modalToDelete}`, {
+        method: 'DELETE',
+      })
+    )
+      .then(() => {
+        strapi.notification.success('Settings.roles.deleted');
+      })
+      .catch(err => {
+        console.error(err);
+        strapi.notification.error('notification.error');
+      })
+      .finally(() => {
+        setModalDelete(null);
+        getData();
+        strapi.unlockApp();
+      });
+  };
+
+  const handleNewRoleClick = () => push(`/settings/${pluginId}/roles/new`);
+
+  /* eslint-disable indent */
+  const headerActions = canCreate
+    ? [
+        {
+          label: formatMessage({
+            id: 'List.button.roles',
+            defaultMessage: 'Add new role',
+          }),
+          onClick: handleNewRoleClick,
+          color: 'primary',
+          type: 'button',
+          icon: true,
+        },
+      ]
+    : [];
+  /* eslint-enable indent */
+
+  const checkCanDeleteRole = useCallback(
+    role => {
+      return canDelete && !['public', 'authenticated'].includes(role.type);
+    },
+    [canDelete]
+  );
 
   return (
     <>
@@ -48,8 +96,9 @@ const RoleListPage = () => {
           id: 'Settings.roles.list.description',
           defaultMessage: 'Define the roles and permissions for your users.',
         })}
+        actions={headerActions}
         // Show a loader in the header while requesting data
-        isLoading={isLoading}
+        isLoading={isLoading || isLoadingForPermissions}
       />
       <BaselineAlignment />
       <RoleListWrapper>
@@ -61,11 +110,10 @@ const RoleListPage = () => {
             { number: roles.length }
           )}
           items={roles}
-          isLoading={isLoading}
+          isLoading={isLoading || isLoadingForPermissions}
           customRowComponent={role => (
             <RoleRow
               onClick={() => handleGoTo(role.id)}
-              canUpdate={canUpdate}
               links={[
                 {
                   icon: canUpdate ? <Pencil fill="#0e1622" /> : null,
@@ -74,15 +122,24 @@ const RoleListPage = () => {
                   },
                 },
                 {
-                  icon: canDelete ? <FontAwesomeIcon icon="trash-alt" /> : null,
-                  onClick: handleToggle,
+                  icon: checkCanDeleteRole(role) ? <FontAwesomeIcon icon="trash-alt" /> : null,
+                  onClick: e => {
+                    e.preventDefault();
+                    setModalDelete(role.id);
+                    e.stopPropagation();
+                  },
                 },
               ]}
               role={role}
             />
           )}
         />
-        {!roles && !isLoading && <EmptyRole />}
+        {!roles && !isLoading && !isLoadingForPermissions && <EmptyRole />}
+        <PopUpWarning
+          isOpen={Boolean(modalToDelete)}
+          onConfirm={handleDelete}
+          toggleModal={() => setModalDelete(null)}
+        />
       </RoleListWrapper>
     </>
   );
