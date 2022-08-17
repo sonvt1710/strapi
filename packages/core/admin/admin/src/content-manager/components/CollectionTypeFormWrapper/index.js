@@ -40,13 +40,8 @@ const CollectionTypeFormWrapper = ({ allLayoutData, children, slug, id, origin }
   const { push, replace } = useHistory();
   const [{ rawQuery }] = useQueryParams();
   const dispatch = useDispatch();
-  const {
-    componentsDataStructure,
-    contentTypeDataStructure,
-    data,
-    isLoading,
-    status,
-  } = useSelector(selectCrudReducer);
+  const { componentsDataStructure, contentTypeDataStructure, data, isLoading, status } =
+    useSelector(selectCrudReducer);
   const redirectionLink = useFindRedirectionLink(slug);
 
   const isMounted = useRef(true);
@@ -65,7 +60,7 @@ const CollectionTypeFormWrapper = ({ allLayoutData, children, slug, id, origin }
   }, [slug, id, isCreatingEntry, origin]);
 
   const cleanClonedData = useCallback(
-    data => {
+    (data) => {
       if (!origin) {
         return data;
       }
@@ -81,7 +76,7 @@ const CollectionTypeFormWrapper = ({ allLayoutData, children, slug, id, origin }
     [origin]
   );
 
-  const cleanReceivedData = useCallback(data => {
+  const cleanReceivedData = useCallback((data) => {
     const cleaned = removePasswordFieldsFromData(
       data,
       allLayoutDataRef.current.contentType,
@@ -136,7 +131,7 @@ const CollectionTypeFormWrapper = ({ allLayoutData, children, slug, id, origin }
     const CancelToken = axios.CancelToken;
     const source = CancelToken.source();
 
-    const fetchData = async source => {
+    const fetchData = async (source) => {
       dispatch(getData());
 
       try {
@@ -201,10 +196,8 @@ const CollectionTypeFormWrapper = ({ allLayoutData, children, slug, id, origin }
   ]);
 
   const displayErrors = useCallback(
-    err => {
+    (err) => {
       const errorPayload = err.response.data;
-      console.error(errorPayload);
-
       let errorMessage = get(errorPayload, ['error', 'message'], 'Bad Request');
 
       // TODO handle errors correctly when back-end ready
@@ -220,7 +213,7 @@ const CollectionTypeFormWrapper = ({ allLayoutData, children, slug, id, origin }
   );
 
   const onDelete = useCallback(
-    async trackerProperty => {
+    async (trackerProperty) => {
       try {
         trackUsageRef.current('willDeleteEntry', trackerProperty);
 
@@ -272,10 +265,14 @@ const CollectionTypeFormWrapper = ({ allLayoutData, children, slug, id, origin }
         dispatch(setStatus('resolved'));
 
         replace(`/content-manager/collectionType/${slug}/${data.id}${rawQuery}`);
+
+        return Promise.resolve(data);
       } catch (err) {
-        trackUsageRef.current('didNotCreateEntry', { error: err, trackerProperty });
         displayErrors(err);
+        trackUsageRef.current('didNotCreateEntry', { error: err, trackerProperty });
         dispatch(setStatus('resolved'));
+
+        return Promise.reject(err);
       }
     },
     [
@@ -308,9 +305,13 @@ const CollectionTypeFormWrapper = ({ allLayoutData, children, slug, id, origin }
         type: 'success',
         message: { id: getTrad('success.record.publish') },
       });
+
+      return Promise.resolve(data);
     } catch (err) {
       displayErrors(err);
       dispatch(setStatus('resolved'));
+
+      return Promise.reject(err);
     }
   }, [cleanReceivedData, displayErrors, id, slug, dispatch, toggleNotification]);
 
@@ -334,11 +335,15 @@ const CollectionTypeFormWrapper = ({ allLayoutData, children, slug, id, origin }
         dispatch(submitSucceeded(cleanReceivedData(data)));
 
         dispatch(setStatus('resolved'));
+
+        return Promise.resolve(data);
       } catch (err) {
         trackUsageRef.current('didNotEditEntry', { error: err, trackerProperty });
         displayErrors(err);
 
         dispatch(setStatus('resolved'));
+
+        return Promise.reject(err);
       }
     },
     [cleanReceivedData, displayErrors, slug, id, dispatch, toggleNotification]
@@ -362,9 +367,13 @@ const CollectionTypeFormWrapper = ({ allLayoutData, children, slug, id, origin }
 
       dispatch(submitSucceeded(cleanReceivedData(data)));
       dispatch(setStatus('resolved'));
+
+      return Promise.resolve(data);
     } catch (err) {
       dispatch(setStatus('resolved'));
       displayErrors(err);
+
+      return Promise.reject(err);
     }
   }, [cleanReceivedData, displayErrors, id, slug, dispatch, toggleNotification]);
 

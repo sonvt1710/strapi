@@ -6,7 +6,7 @@ import packageJSON from '../../../../../package.json';
 const strapiVersion = packageJSON.version;
 const showUpdateNotif = !JSON.parse(localStorage.getItem('STRAPI_UPDATE_NOTIF'));
 
-const fetchStrapiLatestRelease = async toggleNotification => {
+const fetchStrapiLatestRelease = async (toggleNotification) => {
   try {
     const {
       data: { tag_name },
@@ -21,7 +21,7 @@ const fetchStrapiLatestRelease = async toggleNotification => {
         link: {
           url: `https://github.com/strapi/strapi/releases/tag/${tag_name}`,
           label: {
-            id: 'notification.version.update.link',
+            id: 'global.see-more',
           },
         },
         blockTransition: true,
